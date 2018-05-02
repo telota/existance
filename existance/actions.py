@@ -57,8 +57,8 @@ class EphemeralAction(ActionBase):
 class DownloadInstaller(EphemeralAction):
     def do(self):
         self.context.installer_location = (
-            Path(self.config['existance']['installer_cache'])
-            / 'exist-installer-{version}.jar'.format(version=self.args.version)
+            self.config['existance']['installer_cache'] /
+            'exist-installer-{version}.jar'.format(version=self.args.version)
         )
 
         if self.context.installer_location.exists():

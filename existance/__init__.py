@@ -94,21 +94,24 @@ def parse_args(args: Tuple[str], config) -> argparse.Namespace:
     subcommands = root_parser.add_subparsers()
 
     root_parser.add_argument(
-        '--base-directory', default=config['exist-db']['base_directory'],
+        '--base-directory',
+        default=config['exist-db']['base_directory'], type=Path,
         help='TODO'
     )
     root_parser.add_argument(
-        '--instances-settings', default=config['exist-db']['instances_settings'],
+        '--instances-settings',
+        default=config['exist-db']['instances_settings'], type=Path,
         help='TODO'
     )
     root_parser.add_argument(
-        '--log-directory', default=config['exist-db']['log_directory'],
+        '--log-directory',
+        default=config['exist-db']['log_directory'], type=Path,
         help='TODO'
     )
 
     root_parser.add_argument(
         '--installer-cache',
-        default=config['existance'].get('installer_cache', TMP),
+        default=config['existance'].get('installer_cache', TMP), type=Path,
         help='TODO'
     )
 
