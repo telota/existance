@@ -51,6 +51,8 @@ class PlanExecutor:
                 action = action(self)
                 action.do()
             except Exception:
+                if not isinstance(action, actions.EphemeralAction):
+                    self.rollback_plan.insert(0, action)
                 self.do_rollback()
                 raise
             else:

@@ -22,6 +22,10 @@ def export(obj):
     return obj
 
 
+class Abort(Exception):
+    """ Raised to invoke an undo of all previously executed dos. """
+
+
 class ActionBase(ABC):
     def __init__(self, executor: 'PlanExecutor'):
         self.executor = executor
