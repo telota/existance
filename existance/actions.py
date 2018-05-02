@@ -54,6 +54,19 @@ class EphemeralAction(ActionBase):
         pass
 
 
+class ConcludedMessage:
+    def __init__(self, message):
+        self.message = message
+
+    def __enter__(self):
+        print(self.message, end=' ')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            print('✔')
+        else:
+            print('✖️')
+
 #
 
 
@@ -67,20 +80,21 @@ class DownloadInstaller(EphemeralAction):
 
         if self.context.installer_location.exists():
             print(
-                "Installer found at {location}."
+                "Installer found at {location}. '✔'"
                 .format(location=self.context.installer_location)
             )
             return
 
-        print('Obtaining installer', end='')
-        response = requests.get(
-            EXISTDB_INSTALLER_URL.format(version=self.args.version),
-            stream=True
-        )
-        with self.context.installer_location.open('wb') as f:
-            for chunk in response.iter_content(chunk_size=4096):
-                f.write(chunk)
-        print('✔')
+        with ConcludedMessage('Obtaining installer'):
+            response = requests.get(
+                EXISTDB_INSTALLER_URL.format(version=self.args.version),
+                stream=True
+            )
+            with self.context.installer_location.open('wb') as f:
+                for chunk in response.iter_content(chunk_size=4096):
+                    f.write(chunk)
+
+            # TODO file ownership?
 
 
 @export
