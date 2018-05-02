@@ -75,6 +75,7 @@ def make_install_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
         actions.CalculateTargetPaths,
         actions.DownloadInstaller,
         actions.MakeDataDir,
+        actions.InstallerPrologue,
     ]
 
     return result

@@ -1,13 +1,16 @@
 import re
 import shutil
+import textwrap
 from abc import ABC, abstractmethod
 from csv import DictReader
+from datetime import datetime
 
 import requests
 
 from existance.constants import (
     EXISTDB_INSTALLER_URL, LATEST_EXISTDB_RECORD_URL
 )
+from existance.utils import make_password_proposal
 
 
 is_semantical_version = re.compile(r'^\d+\.\d+(\.\d+)?').match
@@ -115,6 +118,37 @@ class GetLatestExistVersion(EphemeralAction):
         self.context.latest_existdb_version = requests.get(
             LATEST_EXISTDB_RECORD_URL
         ).json()['tag_name']
+
+
+@export
+class InstallerPrologue(EphemeralAction):
+    # TODO remove when solved: https://github.com/eXist-db/exist/issues/964
+
+    def do(self):
+        year = datetime.today().year
+        print(textwrap.dedent(f"""
+            A long time ago in a galaxy far too close to be ignored…
+            It is the the year {year}, you're about to install an eXist-db and in the
+            process you will be challenged with the mashup of a Turing and a Weichsler
+            test resembled in something baptized as 'interactive installer'.
+            Of course you shouldn't worry about it - it's just a test -  or even take it
+            serious, but here are some hints to get you through:
+            
+            When asked for a target path, you *MUST* repeat these words:
+                {self.context.target_dir}
+            Will this lead the way to wisdom or just a swamp hole at the galaxy's pampa
+            belt?
+            
+            The new oil - which was gold before - is data, put its vault there:
+                {self.context.target_data_dir.reloative_to(self.context.target_dir)}
+            
+            May it be the wisdom evoked by modern computing powers you want to pretend
+            or just protection against little green hoodlums, this one seems to be a good
+            curse, er, administrator's password:
+                {make_password_proposal(32)}
+            
+            Everything else is a matter of taste or not a matter at all.        
+        """).strip())
 
 
 @export
