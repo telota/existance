@@ -1,7 +1,7 @@
 import re
+import shutil
 from abc import ABC, abstractmethod
 from csv import DictReader
-from pathlib import Path
 
 import requests
 
@@ -115,6 +115,25 @@ class GetLatestExistVersion(EphemeralAction):
         self.context.latest_existdb_version = requests.get(
             LATEST_EXISTDB_RECORD_URL
         ).json()['tag_name']
+
+
+@export
+class MakeDataDir(Action):
+    # TODO remove when fixed: https://github.com/eXist-db/exist/issues/1576
+    def __init__(self):
+        self.created = False
+
+    def do(self):
+        if not self.context.target_data_dir.exists():
+            try:
+                self.context.target_data_dir.mkdir()
+            except Exception:
+                self.created = self.context.target_data_dir.exists()
+                raise
+
+    def undo(self):
+        if self.created:
+            shutil.rmtree(self.context.target_data_dir)
 
 
 @export
