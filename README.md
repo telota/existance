@@ -27,6 +27,7 @@ user = existdb
 group = telota
 
 base_directory = /opt
+instance_dir_pattern = exist_{instance_name}_{instance_id}
 instances_settings = %(base_directory)s/exist_instances_settings.csv
 
 log_directory = /var/logs/existdb

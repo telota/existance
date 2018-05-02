@@ -71,6 +71,18 @@ class ConcludedMessage:
 
 
 @export
+class CalculateTargetPaths(EphemeralAction):
+    def do(self):
+        base = self.context.target_base = (
+            self.args.base_directory /
+            self.config['exist-db'].get('instance_dir_pattern', '{instance_name}')
+                .format(instance_name=self.args.name, instance_id=self.args.id)
+        )
+        self.context.target_dir = base / 'existdb'
+        self.context.target_data_dir = base / 'data'
+
+
+@export
 class DownloadInstaller(EphemeralAction):
     def do(self):
         self.context.installer_location = (

@@ -72,6 +72,7 @@ def make_install_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
         actions.SetDesignatedInstanceID,
         actions.SetDesignatedInstanceName,
         actions.SetDesignatedExistDBVersion,
+        actions.CalculateTargetPaths,
         actions.DownloadInstaller,
     ]
 
