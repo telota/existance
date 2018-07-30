@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 from configparser import ConfigParser
 from pathlib import Path
@@ -8,6 +9,12 @@ from typing import List, Tuple
 
 from existance import actions
 from existance.constants import TMP
+
+
+#
+
+
+cli_parser = None
 
 
 #
@@ -28,10 +35,10 @@ class PlanExecutor:
         return self.execute_plan()
 
     def do_rollback(self):
-        print('Rolling back changes… ', end ='')
+        print('Rolling back changes… ', end='')
         for action in self.rollback_plan:
             try:
-                action()
+                action.undo()
             except KeyboardInterrupt:
                 pass
             except Exception:
@@ -76,6 +83,17 @@ def make_install_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
         actions.DownloadInstaller,
         actions.MakeDataDir,
         actions.InstallerPrologue,
+        actions.RunExistInstaller,
+        actions.CreateBackupDirectory,
+        actions.SetFilePermissions,
+        actions.SetJettyWebappContext,
+        actions.AddBackupTask,
+        actions.AddProxyMapping,
+        actions.SetupLoggingAggregation,
+        actions.WriteInstanceSettings,
+        actions.EnableSystemdUnit,
+        actions.StartSystemdUnit,
+        actions.ReloadNginx,
     ]
 
     return result
@@ -93,30 +111,35 @@ def make_systemd_tenmplate_plan(args: argparse.Namespace) -> List[actions.Action
     raise NotImplementedError
 
 
-def parse_args(args: Tuple[str], config) -> argparse.Namespace:
-    # TODO description
-    root_parser = argparse.ArgumentParser()
-    subcommands = root_parser.add_subparsers()
+def make_argparser(config: dict) -> argparse.ArgumentParser:
+    global cli_parser
 
-    root_parser.add_argument(
+    if cli_parser is not None:
+        return cli_parser
+
+    # TODO description
+    cli_parser = argparse.ArgumentParser()
+    subcommands = cli_parser.add_subparsers()
+
+    cli_parser.add_argument(
         '--base-directory',
         default=config['exist-db']['base_directory'], type=Path,
         help='TODO'
     )
-    root_parser.add_argument(
+    cli_parser.add_argument(
         '--instances-settings',
         default=config['exist-db']['instances_settings'], type=Path,
         help='TODO'
     )
-    root_parser.add_argument(
+    cli_parser.add_argument(
         '--log-directory',
         default=config['exist-db']['log_directory'], type=Path,
         help='TODO'
     )
 
-    root_parser.add_argument(
+    cli_parser.add_argument(
         '--installer-cache',
-        default=config['existance'].get('installer_cache', TMP), type=Path,
+        default=config['existance'].pop('installer_cache', TMP), type=Path,
         help='TODO'
     )
 
@@ -161,7 +184,12 @@ def parse_args(args: Tuple[str], config) -> argparse.Namespace:
     systemd_template_parser = subcommands.add_parser('systemd-service-template')
     systemd_template_parser.set_defaults(plan_factory=make_systemd_tenmplate_plan)
 
-    return root_parser.parse_args(args)
+    return cli_parser
+
+
+def parse_args(args: Tuple[str], config: dict) -> argparse.Namespace:
+    parser = make_argparser(config)
+    return parser.parse_args(args)
 
 
 def read_config():
@@ -186,21 +214,26 @@ def read_config():
 # main
 
 
-def main(args=sys.argv[1:]):
-    # TODO fork self with sudo if not executed as root
+def main(command=sys.argv[0], args=sys.argv[1:]):
     try:
+        if os.geteuid() != 0:
+            os.execvp('sudo', ['sudo', command] + args)
         config = read_config()
         args = parse_args(args, config)
-        actions_plan = args.plan_factory(args, config)
+        if not hasattr(args, 'plan_factory'):
+            cli_parser.print_help()
+            raise SystemExit(0)
+        actions_plan = args.plan_factory(args)
         executor = PlanExecutor(actions_plan, args, config)
         raise SystemExit(executor())
     except KeyboardInterrupt:
-        print('Received keyboard interrupt, rolling back.')
+        print('\nReceived keyboard interrupt, rolling back.')
         executor.do_rollback()
+        exit_code = 1
     except SystemExit as e:
         exit_code = e.code
     except Exception:
-        print('Please report this unhandled exception:')
+        print('\nPlease report this unhandled exception:')
         print_exc(file=sys.stdout)
         exit_code = 3
     finally:

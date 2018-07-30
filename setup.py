@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from setuptools import setup, find_packages
 
 
@@ -16,22 +17,21 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/telota/existance',
     author='Martin Wagner',
-    author_email='maertin.wagner@bbaw.de',
+    author_email='martin.wagner@bbaw.de',
     classifiers=[
-        'Development Status :: 1 - Planning',
+        'Development Status :: 3 - Alpha',
         'Intended Audience :: System Administrators',
         'License :: OSI Approved'
         ' :: GNU Library or Lesser General Public License (LGPL)',
         'Operating System :: POSIX',
         'Programming Language :: Python :: 3 :: Only',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Topic :: System :: Installation/Setup'
     ],
     keywords='eXist-db',
     packages=find_packages(exclude=['docs', 'tests']),
     requires=['requests'],
-    python_requires=">=3.5",
+    python_requires=">=3.6",
     entry_points={
         'console_scripts': [
             'existance=existance:main',

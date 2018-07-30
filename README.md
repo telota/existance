@@ -19,7 +19,7 @@ all keys that are presented in this sample:
 ```ini
 [existance]
 
-installer_cache = /var/lib/cache/existance
+installer_cache = /var/cache/existance
 
 [exist-db]
 

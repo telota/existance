@@ -1,16 +1,22 @@
+# TODO catch all possible wrongdoings
+
 import re
 import shutil
+import subprocess
+import sys
 import textwrap
 from abc import ABC, abstractmethod
-from csv import DictReader
+from csv import DictReader, DictWriter
 from datetime import datetime
+from pathlib import Path
+from xml.etree import ElementTree
 
 import requests
 
 from existance.constants import (
-    EXISTDB_INSTALLER_URL, LATEST_EXISTDB_RECORD_URL
-)
-from existance.utils import make_password_proposal
+    EXISTDB_INSTALLER_URL, LATEST_EXISTDB_RECORD_URL,
+    INSTANCE_SETTINGS_FIELDS)
+from existance.utils import make_password_proposal, relative_path
 
 
 is_semantical_version = re.compile(r'^\d+\.\d+(\.\d+)?').match
@@ -20,13 +26,14 @@ is_valid_xmx_value = re.compile(r'^\d+[kmg]]$').match
 __all__ = []
 
 
-def export(obj):
-    __all__.append(obj.__name__)
-    return obj
+# exceptions
 
 
 class Abort(Exception):
     """ Raised to invoke an undo of all previously executed dos. """
+
+
+# bases
 
 
 class ActionBase(ABC):
@@ -57,6 +64,9 @@ class EphemeralAction(ActionBase):
         pass
 
 
+# helpers
+
+
 class ConcludedMessage:
     def __init__(self, message):
         self.message = message
@@ -70,7 +80,69 @@ class ConcludedMessage:
         else:
             print('✖️')
 
+
+def export(obj):
+    __all__.append(obj.__name__)
+    return obj
+
+
+def external_command(*args, **kwargs):
+    args = tuple(str(x) for x in args)
+    run_kwargs = {'stdin': sys.stdin, 'stdout': sys.stdout, 'stderr': sys.stderr,
+                  'check': True}
+    run_kwargs.update(kwargs)
+    subprocess.run(args, **kwargs)
+    # TODO *maybe* the input argument can be used to provide input and thus the installer
+    # may not require user input
+
+
 #
+
+
+@export
+class AddBackupTask(EphemeralAction):
+    # TODO this should rather be defined in the config file
+    def do(self):
+        with ConcludedMessage("Adding backup job to exist's config."):
+            config_path = self.context.target_dir / 'conf.xml'
+            tree = ElementTree.parse(config_path)
+
+            scheduler = tree.find('./scheduler')
+
+            job = ElementTree.SubElement(scheduler, 'job')
+            job.set('name', f'{self.args.name}_consistency_check_and_backup')
+            job.set('type', 'system')
+            job.set('class', 'org.exist.storage.ConsistencyCheckTask')
+            job.set('period', str(4 * 60 * 60 * 1000))  # every 4h
+            job.set('delay', str((self.args.id - INSTANCE_PORT_RANGE_START) * 15 * 60 * 1000))  # 15min offset per instance
+
+            for name, value in (
+                ('output', '../backup'), ('backup', 'yes'), ('incremental', 'yes'),
+                ('incremental-check', 'yes'), ('max', '6')
+            ):
+                parameter = ElementTree.SubElement(job, 'parameter')
+                parameter.set('name', name)
+                parameter.set('value', value)
+
+            tree.write(config_path)
+
+
+class AddProxyMapping(Action):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # TODO make this configurable
+        self.mapping_path = Path('/etc') / 'nginx' / 'proxy-mappings' / str(self.args.id)
+
+    def do(self):
+        with self.mapping_path.open('wt') as f:
+            print(f'location /{self.args.name}/ '
+                  f'{{proxy_pass http://localhost:{self.args.id}/{self.args.name}/ ;}}',
+                  file=f)
+        external_command('chown', f'root:{self.args.group}', self.mapping_path)
+        external_command('chmod', 'ug=rw,o=r', self.mapping_path)
+
+    def undo(self):
+        self.mapping_path.unlink()
 
 
 @export
@@ -82,16 +154,25 @@ class CalculateTargetPaths(EphemeralAction):
                 .format(instance_name=self.args.name, instance_id=self.args.id)
         )
         self.context.target_dir = base / 'existdb'
+        self.context.backup_dir = base / 'backup'
         self.context.target_data_dir = base / 'data'
+
+
+@export
+class CreateBackupDirectory(Action):
+    def do(self):
+        with ConcludedMessage('Creating backup folder.'):
+            self.context.backup_dir.mkdir()
+
+    def undo(self):
+        with ConcludedMessage('Removing backup folder.'):
+            shutil.rmtree(self.context.backup_dir)
 
 
 @export
 class DownloadInstaller(EphemeralAction):
     def do(self):
-        self.context.installer_location = (
-            self.config['existance']['installer_cache'] /
-            'exist-installer-{version}.jar'.format(version=self.args.version)
-        )
+        self.context.installer_location = self.args.installer_cache / f'exist-installer-{self.args.version}.jar'
 
         if self.context.installer_location.exists():
             print(
@@ -100,7 +181,7 @@ class DownloadInstaller(EphemeralAction):
             )
             return
 
-        with ConcludedMessage('Obtaining installer'):
+        with ConcludedMessage('Obtaining installer.'):
             response = requests.get(
                 EXISTDB_INSTALLER_URL.format(version=self.args.version),
                 stream=True
@@ -113,11 +194,22 @@ class DownloadInstaller(EphemeralAction):
 
 
 @export
+class EnableSystemdUnit(Action):
+    def do(self):
+        with ConcludedMessage('Enabling systemd unit for instance.'):
+            external_command('systemctl', 'enable', f'existdb@{self.args.id}')
+
+    def undo(self):
+        with ConcludedMessage('Disabling systemd unit for instance.'):
+            external_command('systemctl', 'disable', f'existdb@{self.args.id}')
+
+
+@export
 class GetLatestExistVersion(EphemeralAction):
     def do(self):
         self.context.latest_existdb_version = requests.get(
             LATEST_EXISTDB_RECORD_URL
-        ).json()['tag_name']
+        ).json()['tag_name'].split('-', maxsplit=1)[1]
 
 
 @export
@@ -126,7 +218,7 @@ class InstallerPrologue(EphemeralAction):
 
     def do(self):
         year = datetime.today().year
-        print(textwrap.dedent(f"""
+        print(textwrap.dedent(f"""\
             A long time ago in a galaxy far too close to be ignored…
             It is the the year {year}, you're about to install an eXist-db and in the
             process you will be challenged with the mashup of a Turing and a Weichsler
@@ -140,7 +232,7 @@ class InstallerPrologue(EphemeralAction):
             belt?
             
             The new oil - which was gold before - is data, put its vault there:
-                {self.context.target_data_dir.reloative_to(self.context.target_dir)}
+                {relative_path(self.context.target_data_dir, self.context.target_dir)}
             
             May it be the wisdom evoked by modern computing powers you want to pretend
             or just protection against little green hoodlums, this one seems to be a good
@@ -148,22 +240,24 @@ class InstallerPrologue(EphemeralAction):
                 {make_password_proposal(32)}
             
             Everything else is a matter of taste or not a matter at all.        
-        """).strip())
+        """))
 
 
 @export
 class MakeDataDir(Action):
     # TODO remove when fixed: https://github.com/eXist-db/exist/issues/1576
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.created = False
 
     def do(self):
         if not self.context.target_data_dir.exists():
-            try:
-                self.context.target_data_dir.mkdir()
-            except Exception:
-                self.created = self.context.target_data_dir.exists()
-                raise
+            with ConcludedMessage('Creating the data directory.'):
+                try:
+                    self.context.target_data_dir.mkdir(parents=True)
+                except Exception:
+                    self.created = self.context.target_data_dir.exists()
+                    raise
 
     def undo(self):
         if self.created:
@@ -175,8 +269,38 @@ class ReadInstancesSettings(EphemeralAction):
     def do(self):
         with open(self.args.instances_settings, 'rt') as f:
             self.context.instances_settings = {
-                int(x['id']): x for x in DictReader(f, fieldnames=('id', 'name', 'xmx'))
+                int(x['id']): x for x in DictReader(f, fieldnames=INSTANCE_SETTINGS_FIELDS)
             }
+
+
+@export
+class ReloadNginx(EphemeralAction):
+    def do(self):
+        with ConcludedMessage('Reloading nginx configuration.'):
+            external_command('systemctl', 'reload', 'nginx')
+
+
+@export
+class RemoveUnwantedJettyConfig(EphemeralAction):
+    def do(self):
+        unwanted_tokens = self.config['exist-db']['unwanted_jetty_config'].split(',')
+        with ConcludedMessage('Disabling unwanted parts of the Jetty config.'):
+            for token in unwanted_tokens:
+                external_command('sed', '-i', f'/{token}/d',
+                                 self.context.target_dir / 'tools' / 'jetty' / 'etc'
+                                 / 'standard.enabled-jetty-configs')
+
+
+@export
+class RunExistInstaller(Action):
+    def do(self):
+        external_command(
+            'java', '-jar', self.context.installer_location, '-console'
+        )
+
+    def undo(self):
+        with ConcludedMessage('Removing installation folder.'):
+            shutil.rmtree(self.context.target_dir, ignore_errors=True)
 
 
 @export
@@ -188,7 +312,7 @@ class SetDesignatedExistDBVersion(EphemeralAction):
         while args.version is None or not is_semantical_version(args.version):
             value = input(
                 'Which version of eXist-db shall be installed or upgraded to? '
-                '[{proposed_version}]'
+                '[{proposed_version}] '
                 .format(proposed_version=proposed_version)
             )
             if not value:
@@ -203,7 +327,11 @@ class SetDesignatedExistDBVersion(EphemeralAction):
 class SetDesignatedInstanceID(EphemeralAction):
     def do(self):
         args, instances_settings = self.args, self.context.instances_settings
-        proposed_id = max(instances_settings) + 1
+
+        if instances_settings:
+            proposed_id = max(instances_settings.keys()) + 1
+        else:
+            proposed_id = INSTANCE_PORT_RANGE_START
 
         while args.id is None or args.id in instances_settings:
             value = input(
@@ -223,7 +351,7 @@ class SetDesignatedInstanceName(EphemeralAction):
     def do(self):
         args, context = self.args, self.context
         expected_pattern = r'^[a-z_-]{4,}$'  # TODO configurable?
-        used_names = [x['name'] for x in context.instances_settings]
+        used_names = [x['name'] for x in context.instances_settings.values()]
 
         while args.name is None or args.name in used_names \
                 or not re.match(expected_pattern, args.name):
@@ -259,3 +387,94 @@ class SetDesignatedXmXValue(EphemeralAction):
                     "The provided value is not valid, please enter something "
                     "like '1024m'."
                 )
+
+
+@export
+class SetFilePermissions(EphemeralAction):
+    def do(self):
+        with ConcludedMessage('Adjusting file access permissions.'):
+            external_command(
+                'chown', '-R', f'{self.args.user}.{self.args.group}',
+                self.context.target_base
+            )
+            external_command(
+                'chmod', 'g+w',
+                self.context.target_base, self.context.target_dir,
+                self.context.backup_dir, self.context.target_data_dir
+            )
+
+        with ConcludedMessage(
+                'Allow write access to all xml-files for group-members in the '
+                'application directory.'
+        ):
+            for xml_file in self.context.target_dir.glob('**/*.xml'):
+                external_command('chmod', 'g+w', xml_file)
+
+
+@export
+class SetJettyWebappContext(EphemeralAction):
+    def do(self):
+        config_path = (self.context.target_dir / 'tools' / 'jetty' / 'webapps'
+                       / 'exist-webapp-context.xml')
+
+        with ConcludedMessage("Setting Jetty's context path."):
+            tree = ElementTree.parse(config_path)
+            tree.find("./Set[@name='contextPath']").text = f'/{self.args.name}'
+            tree.write(config_path)
+
+
+@export
+class SetupLoggingAggregation(Action):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # TODO make that configurable
+        self.base_dir = Path('/var') / 'log' / 'existdb' / f'{self.args.id}_{self.args.name}'
+
+    def do(self):
+        with ConcludedMessage('Setting up log folder.'):
+            self.base_dir.mkdir(mode=0o770, parents=True)
+            external_command('chown', f'{self.args.user}:{self.args.group}', self.base_dir)
+            (self.base_dir / 'jetty').symlink_to(
+                self.context.target_dir / 'tools' / 'jetty' / 'logs'
+            )
+            (self.base_dir / 'existdb').symlink_to(
+                self.context.target_dir / 'webapp' / 'WEB-INF' / 'logs'
+            )
+
+    def undo(self):
+        with ConcludedMessage('Removing log folder.'):
+            shutil.rmtree(self.base_dir)
+
+
+@export
+class StartSystemdUnit(Action):
+    def do(self):
+        with ConcludedMessage('Starting systemd unit for instance.'):
+            external_command('systemctl', 'start', f'existdb@{self.args.id}')
+
+    def undo(self):
+        with ConcludedMessage('Stopping systemd unit for instance.'):
+            external_command('systemctl', 'stop', f'existdb@{self.args.id}')
+
+
+@export
+class WriteInstanceSettings(Action):
+    def do(self):
+        _id = self.args.id
+        self.context.instances_settings[_id] = {
+            'id': _id,
+            'name': self.args.name,
+            'xmx': self.args.xmx
+        }
+        self._write()
+
+    def undo(self):
+        if self.args.id in self.context.instances_settings:
+            self.context.instances_settings.pop(self.args.id)
+            self._write()
+
+    def _write(self):
+        with ConcludedMessage('Writing instances settings.'):
+            with open(self.args.instances_settings, 'wt') as f:
+                writer = DictWriter(f, fieldnames=INSTANCE_SETTINGS_FIELDS, dialect='unix')
+                writer.writerows((x for x in self.context.instances_settings.values()))
