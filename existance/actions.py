@@ -1,12 +1,10 @@
-# TODO catch all possible wrongdoings
-
+import csv
 import re
 import shutil
 import subprocess
 import sys
 import textwrap
 from abc import ABC, abstractmethod
-from csv import DictReader, DictWriter
 from datetime import datetime
 from pathlib import Path
 from xml.etree import ElementTree
@@ -14,13 +12,19 @@ from xml.etree import ElementTree
 import requests
 
 from existance.constants import (
-    EXISTDB_INSTALLER_URL, LATEST_EXISTDB_RECORD_URL,
+    EXISTDB_INSTALLER_URL, LATEST_EXISTDB_RECORD_URL, INSTANCE_PORT_RANGE_START,
     INSTANCE_SETTINGS_FIELDS)
 from existance.utils import make_password_proposal, relative_path
 
 
 is_semantical_version = re.compile(r'^\d+\.\d+(\.\d+)?').match
 is_valid_xmx_value = re.compile(r'^\d+[kmg]]$').match
+
+
+csv.register_dialect(
+    'instances_settings', csv.unix_dialect,
+    quoting=csv.QUOTE_NONE, skipinitialspace=True
+)
 
 
 __all__ = []
@@ -56,6 +60,20 @@ class Action(ActionBase):
     @abstractmethod
     def undo(self):
         pass
+
+
+def counter(action_cls: type) -> type:
+    class CounterAction(Action):
+        def __init__(self, executor):
+            self._action = action_cls(executor)
+
+        def do(self):
+            self._action.undo()
+
+        def undo(self):
+            raise RuntimeError('This code path is not expected yet.')
+
+    return CounterAction
 
 
 class EphemeralAction(ActionBase):
@@ -104,7 +122,7 @@ class AddBackupTask(EphemeralAction):
     # TODO this should rather be defined in the config file
     def do(self):
         with ConcludedMessage("Adding backup job to exist's config."):
-            config_path = self.context.target_dir / 'conf.xml'
+            config_path = self.context.installation_dir / 'conf.xml'
             tree = ElementTree.parse(config_path)
 
             scheduler = tree.find('./scheduler')
@@ -148,12 +166,12 @@ class AddProxyMapping(Action):
 @export
 class CalculateTargetPaths(EphemeralAction):
     def do(self):
-        base = self.context.target_base = (
+        base = self.context.instance_dir = (
             self.args.base_directory /
             self.config['exist-db'].get('instance_dir_pattern', '{instance_name}')
                 .format(instance_name=self.args.name, instance_id=self.args.id)
         )
-        self.context.target_dir = base / 'existdb'
+        self.context.installation_dir = base / 'existdb'
         self.context.backup_dir = base / 'backup'
         self.context.target_data_dir = base / 'data'
 
@@ -205,6 +223,12 @@ class EnableSystemdUnit(Action):
 
 
 @export
+class GetInstanceName(EphemeralAction):
+    def do(self):
+        self.args.name = self.context.instances_settings[self.args.id]['name']
+
+
+@export
 class GetLatestExistVersion(EphemeralAction):
     def do(self):
         self.context.latest_existdb_version = requests.get(
@@ -227,12 +251,12 @@ class InstallerPrologue(EphemeralAction):
             serious, but here are some hints to get you through:
             
             When asked for a target path, you *MUST* repeat these words:
-                {self.context.target_dir}
+                {self.context.installation_dir}
             Will this lead the way to wisdom or just a swamp hole at the galaxy's pampa
             belt?
             
             The new oil - which was gold before - is data, put its vault there:
-                {relative_path(self.context.target_data_dir, self.context.target_dir)}
+                {relative_path(self.context.target_data_dir, self.context.installation_dir)}
             
             May it be the wisdom evoked by modern computing powers you want to pretend
             or just protection against little green hoodlums, this one seems to be a good
@@ -241,6 +265,19 @@ class InstallerPrologue(EphemeralAction):
             
             Everything else is a matter of taste or not a matter at all.        
         """))
+
+
+@export
+class MakeInstanceDirectory(Action):
+    def do(self):
+        target = self.context.instance_dir
+        with ConcludedMessage(f'Creating instance directory {target}'):
+            target.mkdir(parents=True)
+
+    def undo(self):
+        target = self.context.instance_dir
+        with ConcludedMessage(f'Removing instance directory {target}'):
+            shutil.rmtree(self.context.instance_dir)
 
 
 @export
@@ -269,7 +306,11 @@ class ReadInstancesSettings(EphemeralAction):
     def do(self):
         with open(self.args.instances_settings, 'rt') as f:
             self.context.instances_settings = {
-                int(x['id']): x for x in DictReader(f, fieldnames=INSTANCE_SETTINGS_FIELDS)
+                int(x['id']): x
+                for x in csv.DictReader(
+                    f, fieldnames=INSTANCE_SETTINGS_FIELDS,
+                    dialect='instances_settings'
+                )
             }
 
 
@@ -287,7 +328,7 @@ class RemoveUnwantedJettyConfig(EphemeralAction):
         with ConcludedMessage('Disabling unwanted parts of the Jetty config.'):
             for token in unwanted_tokens:
                 external_command('sed', '-i', f'/{token}/d',
-                                 self.context.target_dir / 'tools' / 'jetty' / 'etc'
+                                 self.context.installation_dir / 'tools' / 'jetty' / 'etc'
                                  / 'standard.enabled-jetty-configs')
 
 
@@ -300,7 +341,24 @@ class RunExistInstaller(Action):
 
     def undo(self):
         with ConcludedMessage('Removing installation folder.'):
-            shutil.rmtree(self.context.target_dir, ignore_errors=True)
+            shutil.rmtree(self.context.installation_dir, ignore_errors=True)
+
+
+@export
+class SelectInstanceID(EphemeralAction):
+    def do(self):
+        args = self.args
+        instances_settings = self.context.instances_settings
+
+        while args.id is None or args.id not in instances_settings:
+            print('Select one of the following ids to proceed:')
+            for item in instances_settings.values():
+                print(f'{item["id"]}: {item["name"]}')
+
+            value = input('> ')
+            if not isinstance(value, int):
+                continue
+            args.id = value
 
 
 @export
@@ -395,11 +453,11 @@ class SetFilePermissions(EphemeralAction):
         with ConcludedMessage('Adjusting file access permissions.'):
             external_command(
                 'chown', '-R', f'{self.args.user}.{self.args.group}',
-                self.context.target_base
+                self.context.instance_dir
             )
             external_command(
                 'chmod', 'g+w',
-                self.context.target_base, self.context.target_dir,
+                self.context.instance_dir, self.context.installation_dir,
                 self.context.backup_dir, self.context.target_data_dir
             )
 
@@ -407,14 +465,14 @@ class SetFilePermissions(EphemeralAction):
                 'Allow write access to all xml-files for group-members in the '
                 'application directory.'
         ):
-            for xml_file in self.context.target_dir.glob('**/*.xml'):
+            for xml_file in self.context.installation_dir.glob('**/*.xml'):
                 external_command('chmod', 'g+w', xml_file)
 
 
 @export
 class SetJettyWebappContext(EphemeralAction):
     def do(self):
-        config_path = (self.context.target_dir / 'tools' / 'jetty' / 'webapps'
+        config_path = (self.context.installation_dir / 'tools' / 'jetty' / 'webapps'
                        / 'exist-webapp-context.xml')
 
         with ConcludedMessage("Setting Jetty's context path."):
@@ -435,10 +493,10 @@ class SetupLoggingAggregation(Action):
             self.base_dir.mkdir(mode=0o770, parents=True)
             external_command('chown', f'{self.args.user}:{self.args.group}', self.base_dir)
             (self.base_dir / 'jetty').symlink_to(
-                self.context.target_dir / 'tools' / 'jetty' / 'logs'
+                self.context.installation_dir / 'tools' / 'jetty' / 'logs'
             )
             (self.base_dir / 'existdb').symlink_to(
-                self.context.target_dir / 'webapp' / 'WEB-INF' / 'logs'
+                self.context.installation_dir / 'webapp' / 'WEB-INF' / 'logs'
             )
 
     def undo(self):
@@ -476,5 +534,5 @@ class WriteInstanceSettings(Action):
     def _write(self):
         with ConcludedMessage('Writing instances settings.'):
             with open(self.args.instances_settings, 'wt') as f:
-                writer = DictWriter(f, fieldnames=INSTANCE_SETTINGS_FIELDS, dialect='unix')
+                writer = csv.DictWriter(f, fieldnames=INSTANCE_SETTINGS_FIELDS, dialect='instances_settings')
                 writer.writerows((x for x in self.context.instances_settings.values()))

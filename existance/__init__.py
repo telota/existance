@@ -73,14 +73,16 @@ class PlanExecutor:
 
 
 def make_install_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
-    result = [
+    return [
         actions.GetLatestExistVersion,
         actions.ReadInstancesSettings,
         actions.SetDesignatedInstanceID,
         actions.SetDesignatedInstanceName,
         actions.SetDesignatedExistDBVersion,
         actions.CalculateTargetPaths,
+
         actions.DownloadInstaller,
+        actions.MakeInstanceDirectory,
         actions.MakeDataDir,
         actions.InstallerPrologue,
         actions.RunExistInstaller,
@@ -96,11 +98,21 @@ def make_install_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
         actions.ReloadNginx,
     ]
 
-    return result
-
 
 def make_uninstall_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
-    raise NotImplementedError
+    return [
+        actions.ReadInstancesSettings,
+        actions.SelectInstanceID,
+        actions.GetInstanceName,
+        actions.CalculateTargetPaths,
+
+        actions.counter(actions.StartSystemdUnit),
+        actions.counter(actions.EnableSystemdUnit),
+        actions.counter(actions.WriteInstanceSettings),
+        actions.counter(actions.AddProxyMapping),
+        actions.ReloadNginx,
+        actions.counter(actions.MakeInstanceDirectory),
+    ]
 
 
 def make_upgrade_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
@@ -150,7 +162,7 @@ def make_argparser(config: dict) -> argparse.ArgumentParser:
         help='TODO',
     )
     install_parser.add_argument(
-        '--id', default=None,
+        '--id', default=None, type=int,
         help='TODO'
     )
     install_parser.add_argument(
@@ -177,6 +189,10 @@ def make_argparser(config: dict) -> argparse.ArgumentParser:
 
     uninstall_parser = subcommands.add_parser('uninstall')
     uninstall_parser.set_defaults(plan_factory=make_uninstall_plan)
+    uninstall_parser.add_argument(
+        '--id', default=None, type=int,
+        help='TODO'
+    )
 
     upgrade_parser = subcommands.add_parser('upgrade')
     upgrade_parser.set_defaults(plan_factory=make_upgrade_plan)
