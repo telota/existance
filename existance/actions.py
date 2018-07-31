@@ -282,19 +282,6 @@ class InstallerPrologue(EphemeralAction):
 
 
 @export
-class MakeInstanceDirectory(Action):
-    def do(self):
-        target = self.context.instance_dir
-        with ConcludedMessage(f'Creating instance directory {target}'):
-            target.mkdir(parents=True)
-
-    def undo(self):
-        target = self.context.instance_dir
-        with ConcludedMessage(f'Removing instance directory {target}'):
-            shutil.rmtree(self.context.instance_dir)
-
-
-@export
 class MakeDataDir(Action):
     # TODO remove when fixed: https://github.com/eXist-db/exist/issues/1576
     def __init__(self, *args, **kwargs):
@@ -313,6 +300,19 @@ class MakeDataDir(Action):
     def undo(self):
         if self.created:
             shutil.rmtree(self.context.target_data_dir)
+
+
+@export
+class MakeInstanceDirectory(Action):
+    def do(self):
+        target = self.context.instance_dir
+        with ConcludedMessage(f'Creating instance directory {target}'):
+            target.mkdir(parents=True)
+
+    def undo(self):
+        target = self.context.instance_dir
+        with ConcludedMessage(f'Removing instance directory {target}'):
+            shutil.rmtree(self.context.instance_dir)
 
 
 @export
