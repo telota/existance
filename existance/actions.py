@@ -176,6 +176,20 @@ class CalculateTargetPaths(EphemeralAction):
         self.context.target_data_dir = base / 'data'
 
 
+# TODO make this configurable
+@export
+class ConfigureSerialization(EphemeralAction):
+    def do(self):
+        with ConcludedMessage("Configuring serialization settings."):
+            config_path = self.context.installation_dir / 'conf.xml'
+            tree = ElementTree.parse(config_path)
+
+            config = tree.find('./serializer')
+            config.set('indent', 'no')
+
+            tree.write(config_path)
+
+
 @export
 class CreateBackupDirectory(Action):
     def do(self):

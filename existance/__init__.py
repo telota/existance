@@ -90,6 +90,7 @@ def make_install_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
         actions.SetFilePermissions,
         actions.SetJettyWebappContext,
         actions.AddBackupTask,
+        actions.ConfigureSerialization,
         actions.AddProxyMapping,
         actions.SetupLoggingAggregation,
         actions.WriteInstanceSettings,
@@ -112,6 +113,7 @@ def make_uninstall_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
         actions.counter(actions.AddProxyMapping),
         actions.ReloadNginx,
         actions.counter(actions.MakeInstanceDirectory),
+        actions.counter(actions.SetupLoggingAggregation),
     ]
 
 
