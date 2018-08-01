@@ -122,8 +122,7 @@ class AddBackupTask(EphemeralAction):
     # TODO this should rather be defined in the config file
     def do(self):
         with ConcludedMessage("Adding backup job to exist's config."):
-            config_path = self.context.installation_dir / 'conf.xml'
-            tree = ElementTree.parse(config_path)
+            tree = ElementTree.parse(self.context.existdb_config)
 
             scheduler = tree.find('./scheduler')
 
@@ -142,7 +141,7 @@ class AddBackupTask(EphemeralAction):
                 parameter.set('name', name)
                 parameter.set('value', value)
 
-            tree.write(config_path)
+            tree.write(self.context.existdb_config)
 
 
 class AddProxyMapping(Action):
@@ -152,15 +151,17 @@ class AddProxyMapping(Action):
         self.mapping_path = Path('/etc') / 'nginx' / 'proxy-mappings' / str(self.args.id)
 
     def do(self):
-        with self.mapping_path.open('wt') as f:
-            print(f'location /{self.args.name}/ '
-                  f'{{proxy_pass http://localhost:{self.args.id}/{self.args.name}/ ;}}',
-                  file=f)
-        external_command('chown', f'root:{self.args.group}', self.mapping_path)
-        external_command('chmod', 'ug=rw,o=r', self.mapping_path)
+        with ConcludedMessage("Writing instance specific nginx config."):
+            with self.mapping_path.open('wt') as f:
+                print(f'location /{self.args.name}/ '
+                      f'{{proxy_pass http://localhost:{self.args.id}/{self.args.name}/ ;}}',
+                      file=f)
+            external_command('chown', f'root:{self.args.group}', self.mapping_path)
+            external_command('chmod', 'ug=rw,o=r', self.mapping_path)
 
     def undo(self):
-        self.mapping_path.unlink()
+        with ConcludedMessage("Removing instance specific nginx config."):
+            self.mapping_path.unlink()
 
 
 @export
@@ -171,9 +172,16 @@ class CalculateTargetPaths(EphemeralAction):
             self.config['exist-db'].get('instance_dir_pattern', '{instance_name}')
                 .format(instance_name=self.args.name, instance_id=self.args.id)
         )
+
         self.context.installation_dir = base / 'existdb'
         self.context.backup_dir = base / 'backup'
-        self.context.target_data_dir = base / 'data'
+        self.context.data_dir = base / 'data'
+
+        self.context.existdb_config = self.context.installation_dir / 'conf.xml'
+        self.context.jetty_config = (
+             self.context.installation_dir / 'tools' / 'jetty' / 'webapps' /
+             'exist-webapp-context.xml'
+        )
 
 
 # TODO make this configurable
@@ -181,13 +189,19 @@ class CalculateTargetPaths(EphemeralAction):
 class ConfigureSerialization(EphemeralAction):
     def do(self):
         with ConcludedMessage("Configuring serialization settings."):
-            config_path = self.context.installation_dir / 'conf.xml'
-            tree = ElementTree.parse(config_path)
+            tree = ElementTree.parse(self.context.existdb_config)
 
             config = tree.find('./serializer')
             config.set('indent', 'no')
 
-            tree.write(config_path)
+            tree.write(self.context.existdb_config)
+
+
+@export
+class CopyDatasnapshot(EphemeralAction):
+    def do(self):
+        with ConcludedMessage('Copying data snapshot to new installation.'):
+            shutil.copytree(self.context.data_snapshot, self.context.data_dir)
 
 
 @export
@@ -245,9 +259,10 @@ class GetInstanceName(EphemeralAction):
 @export
 class GetLatestExistVersion(EphemeralAction):
     def do(self):
-        self.context.latest_existdb_version = requests.get(
-            LATEST_EXISTDB_RECORD_URL
-        ).json()['tag_name'].split('-', maxsplit=1)[1]
+        with ConcludedMessage('Obtaining latest available version.'):
+            self.context.latest_existdb_version = requests.get(
+                LATEST_EXISTDB_RECORD_URL
+            ).json()['tag_name'].split('-', maxsplit=1)[1]
 
 
 @export
@@ -270,7 +285,7 @@ class InstallerPrologue(EphemeralAction):
             belt?
             
             The new oil - which was gold before - is data, put its vault there:
-                {relative_path(self.context.target_data_dir, self.context.installation_dir)}
+                {relative_path(self.context.data_dir, self.context.installation_dir)}
             
             May it be the wisdom evoked by modern computing powers you want to pretend
             or just protection against little green hoodlums, this one seems to be a good
@@ -282,24 +297,29 @@ class InstallerPrologue(EphemeralAction):
 
 
 @export
+class LoadRetainedConfigs(EphemeralAction):
+    def do(self):
+        retained_configs = {}
+        with ConcludedMessage('Loading configs that will be re-used.'):
+
+            for config in (self.context.existdb_config, self.context.jetty_config):
+                with config.open('rt') as f:
+                    retained_configs[config] = f.read()
+
+            self.context.retained_configs = retained_configs
+
+
+@export
 class MakeDataDir(Action):
     # TODO remove when fixed: https://github.com/eXist-db/exist/issues/1576
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.created = False
-
     def do(self):
-        if not self.context.target_data_dir.exists():
+        if not self.context.data_dir.exists():
             with ConcludedMessage('Creating the data directory.'):
-                try:
-                    self.context.target_data_dir.mkdir(parents=True)
-                except Exception:
-                    self.created = self.context.target_data_dir.exists()
-                    raise
+                self.context.data_dir.mkdir(parents=True)
 
     def undo(self):
-        if self.created:
-            shutil.rmtree(self.context.target_data_dir)
+        with ConcludedMessage('Removing data dir.'):
+            shutil.rmtree(self.context.data_dir)
 
 
 @export
@@ -313,6 +333,37 @@ class MakeInstanceDirectory(Action):
         target = self.context.instance_dir
         with ConcludedMessage(f'Removing instance directory {target}'):
             shutil.rmtree(self.context.instance_dir)
+
+
+@export
+class MakeSnapshot(Action):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.snapshot_suffix = datetime.now().strftime('-%Y-%m-%d-%H-%M')
+
+    def do(self):
+        context = self.context
+        data_dir = context.data_dir
+        installation_dir = context.installation_dir
+
+        context.data_snapshot = data_dir.with_name(data_dir.name + self.snapshot_suffix)
+        context.installation_snapshot = installation_dir.with_name(installation_dir.name + self.snapshot_suffix)
+
+        with ConcludedMessage(
+                f'Snapshotting current installation and data folder with suffix {self.snapshot_suffix}'
+        ):
+            installation_dir.rename(context.installation_snapshot)
+            shutil.copytree(data_dir, context.data_snapshot)
+
+    def undo(self):
+        context = self.context
+        installation_dir = context.installation_dir
+        data_dir = context.data_dir
+
+        with ConcludedMessage('Restoring installation and data snapshot.'):
+            context.installation_snapshot.rename(installation_dir)
+            shutil.rmtree(data_dir)
+            context.data_snapshot.rename(data_dir)
 
 
 @export
@@ -338,7 +389,7 @@ class ReloadNginx(EphemeralAction):
 @export
 class RemoveUnwantedJettyConfig(EphemeralAction):
     def do(self):
-        unwanted_tokens = self.config['exist-db']['unwanted_jetty_config'].split(',')
+        unwanted_tokens = self.config['exist-db']['unwanted_jetty_configs'].split(',')
         with ConcludedMessage('Disabling unwanted parts of the Jetty config.'):
             for token in unwanted_tokens:
                 external_command('sed', '-i', f'/{token}/d',
@@ -356,6 +407,15 @@ class RunExistInstaller(Action):
     def undo(self):
         with ConcludedMessage('Removing installation folder.'):
             shutil.rmtree(self.context.installation_dir, ignore_errors=True)
+
+
+@export
+class SaveRetainedConfigs(EphemeralAction):
+    def do(self):
+        with ConcludedMessage('Restoring old configs.'):
+            for config, data in self.context.retained_configs.items():
+                with config.open('tw') as f:
+                    print(data, file=f)
 
 
 @export
@@ -472,7 +532,7 @@ class SetFilePermissions(EphemeralAction):
             external_command(
                 'chmod', 'g+w',
                 self.context.instance_dir, self.context.installation_dir,
-                self.context.backup_dir, self.context.target_data_dir
+                self.context.backup_dir, self.context.data_dir
             )
 
         with ConcludedMessage(
@@ -486,13 +546,10 @@ class SetFilePermissions(EphemeralAction):
 @export
 class SetJettyWebappContext(EphemeralAction):
     def do(self):
-        config_path = (self.context.installation_dir / 'tools' / 'jetty' / 'webapps'
-                       / 'exist-webapp-context.xml')
-
         with ConcludedMessage("Setting Jetty's context path."):
-            tree = ElementTree.parse(config_path)
+            tree = ElementTree.parse(self.context.jetty_config)
             tree.find("./Set[@name='contextPath']").text = f'/{self.args.name}'
-            tree.write(config_path)
+            tree.write(self.context.jetty_config)
 
 
 @export
@@ -532,21 +589,22 @@ class StartSystemdUnit(Action):
 @export
 class WriteInstanceSettings(Action):
     def do(self):
-        _id = self.args.id
-        self.context.instances_settings[_id] = {
-            'id': _id,
-            'name': self.args.name,
-            'xmx': self.args.xmx
-        }
-        self._write()
+        with ConcludedMessage("Adding instance's settings."):
+            _id = self.args.id
+            self.context.instances_settings[_id] = {
+                'id': _id,
+                'name': self.args.name,
+                'xmx': self.args.xmx
+            }
+            self._write()
 
     def undo(self):
         if self.args.id in self.context.instances_settings:
-            self.context.instances_settings.pop(self.args.id)
-            self._write()
+            with ConcludedMessage("Removing this instance's settings."):
+                self.context.instances_settings.pop(self.args.id)
+                self._write()
 
     def _write(self):
-        with ConcludedMessage('Writing instances settings.'):
-            with open(self.args.instances_settings, 'wt') as f:
-                writer = csv.DictWriter(f, fieldnames=INSTANCE_SETTINGS_FIELDS, dialect='instances_settings')
-                writer.writerows((x for x in self.context.instances_settings.values()))
+        with open(self.args.instances_settings, 'wt') as f:
+            writer = csv.DictWriter(f, fieldnames=INSTANCE_SETTINGS_FIELDS, dialect='instances_settings')
+            writer.writerows((x for x in self.context.instances_settings.values()))

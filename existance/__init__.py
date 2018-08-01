@@ -75,6 +75,7 @@ class PlanExecutor:
 def make_install_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
     return [
         actions.GetLatestExistVersion,
+
         actions.ReadInstancesSettings,
         actions.SetDesignatedInstanceID,
         actions.SetDesignatedInstanceName,
@@ -118,11 +119,53 @@ def make_uninstall_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
 
 
 def make_upgrade_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
+    return [
+        actions.GetLatestExistVersion,
+
+        actions.ReadInstancesSettings,
+        actions.SelectInstanceID,
+        actions.GetInstanceName,
+        actions.SetDesignatedExistDBVersion,
+        actions.CalculateTargetPaths,
+
+        actions.counter(actions.StartSystemdUnit),
+        actions.LoadRetainedConfigs,
+        actions.MakeSnapshot,
+
+        actions.DownloadInstaller,
+        actions.MakeDataDir,
+        actions.InstallerPrologue,
+        actions.RunExistInstaller,
+
+        actions.SaveRetainedConfigs,
+        actions.RemoveUnwantedJettyConfig,
+        actions.counter(actions.MakeDataDir),
+        actions.CopyDatasnapshot,
+
+        actions.SetFilePermissions,
+        actions.StartSystemdUnit,
+    ]
+
+
+def make_systemd_template_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
     raise NotImplementedError
 
 
-def make_systemd_tenmplate_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
-    raise NotImplementedError
+#
+
+
+def add_id_arg(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument(
+        '--id', default=None, type=int,
+        help='TODO'
+    )
+
+
+def add_version_arg(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument(
+        '--version', default=None,
+        help='TODO',
+    )
 
 
 def make_argparser(config: dict) -> argparse.ArgumentParser:
@@ -156,34 +199,28 @@ def make_argparser(config: dict) -> argparse.ArgumentParser:
         default=config['existance'].pop('installer_cache', TMP), type=Path,
         help='TODO'
     )
-
-    install_parser = subcommands.add_parser('install')
-    install_parser.set_defaults(plan_factory=make_install_plan)
-    install_parser.add_argument(
+    cli_parser.add_argument(
+        '--user', default=config['exist-db']['user'],
+        help='TODO',
+    )
+    cli_parser.add_argument(
         '--group', default=config['exist-db']['group'],
         help='TODO',
     )
-    install_parser.add_argument(
-        '--id', default=None, type=int,
-        help='TODO'
-    )
-    install_parser.add_argument(
-        '--name', default=None,
-        help='TODO'
-    )
-    install_parser.add_argument(
+    cli_parser.add_argument(
         '--unwanted-jetty-configs',
         default=config['exist-db']['unwanted_jetty_configs'],
         help='TODO',
     )
+
+    install_parser = subcommands.add_parser('install')
+    install_parser.set_defaults(plan_factory=make_install_plan)
+    add_id_arg(install_parser)
     install_parser.add_argument(
-        '--user', default=config['exist-db']['user'],
-        help='TODO',
+        '--name', default=None,
+        help='TODO'
     )
-    install_parser.add_argument(
-        '--version', default=None,
-        help='TODO',
-    )
+    add_version_arg(install_parser)
     install_parser.add_argument(
         '--xmx',
         help='TODO',
@@ -191,16 +228,15 @@ def make_argparser(config: dict) -> argparse.ArgumentParser:
 
     uninstall_parser = subcommands.add_parser('uninstall')
     uninstall_parser.set_defaults(plan_factory=make_uninstall_plan)
-    uninstall_parser.add_argument(
-        '--id', default=None, type=int,
-        help='TODO'
-    )
+    add_id_arg(uninstall_parser)
 
     upgrade_parser = subcommands.add_parser('upgrade')
     upgrade_parser.set_defaults(plan_factory=make_upgrade_plan)
+    add_id_arg(upgrade_parser)
+    add_version_arg(upgrade_parser)
 
     systemd_template_parser = subcommands.add_parser('systemd-service-template')
-    systemd_template_parser.set_defaults(plan_factory=make_systemd_tenmplate_plan)
+    systemd_template_parser.set_defaults(plan_factory=make_systemd_template_plan)
 
     return cli_parser
 
