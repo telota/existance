@@ -55,15 +55,18 @@ class PlanExecutor:
         for action in self.plan:
             try:
                 action = action(self)
+                if not isinstance(action, actions.EphemeralAction):
+                    self.rollback_plan.insert(0, action)
                 action.do()
-            except Exception:
-                if not isinstance(action, actions.EphemeralAction):
-                    self.rollback_plan.insert(0, action)
+            except KeyboardInterrupt:
+                print('Process aborted.')
                 self.do_rollback()
-                raise
-            else:
-                if not isinstance(action, actions.EphemeralAction):
-                    self.rollback_plan.insert(0, action)
+                raise SystemExit(1)
+            except Exception:
+                print('Please report this unhandled exception:')
+                print_exc()
+                self.do_rollback()
+                raise SystemExit(3)
 
         return 0
 
@@ -269,13 +272,14 @@ def read_config():
 
 def main(command=sys.argv[0], args=sys.argv[1:]):
     try:
-        if os.geteuid() != 0:
-            os.execvp('sudo', ['sudo', command] + args)
-        config = read_config()
+        if '--help' not in sys.argv[1:]:
+            if os.geteuid() != 0:
+                os.execvp('sudo', ['sudo', command] + args)
+            config = read_config()
+        else:
+            config = {}
+
         args = parse_args(args, config)
-        if not hasattr(args, 'plan_factory'):
-            cli_parser.print_help()
-            raise SystemExit(0)
         actions_plan = args.plan_factory(args)
         executor = PlanExecutor(actions_plan, args, config)
         raise SystemExit(executor())
