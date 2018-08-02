@@ -505,16 +505,11 @@ class SetDesignatedInstanceName(EphemeralAction):
 class SetDesignatedXmXValue(EphemeralAction):
     def do(self):
         args = self.args
-        xmx_default = self.config['exist-db'].get('XmX_default', '1024m')
 
         while args.xmx is None or not is_valid_xmx_value(args.xmx):
-            value = input(
-                "What's the size for the memory allocation pool? "
-                "[{xmx_default}]".format(xmx_default=xmx_default)
-            )
-            if not value:
-                args.xmx = xmx_default
-            elif not is_valid_xmx_value(value):
+            value = input("What's the size for the memory allocation pool? ")
+            args.xmx = value
+            if not is_valid_xmx_value(value):
                 print(
                     "The provided value is not valid, please enter something "
                     "like '1024m'."
