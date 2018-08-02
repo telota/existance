@@ -35,7 +35,7 @@ class PlanExecutor:
         return self.execute_plan()
 
     def do_rollback(self):
-        print('Rolling back changes… ', end='')
+        print('Rolling back changes… ')
         for action in self.rollback_plan:
             try:
                 action.undo()
@@ -45,7 +45,6 @@ class PlanExecutor:
                 print('Please report this unhandled exception:')
                 print_exc()
                 print('The rollback is continued anyway.')
-        print('✔')
 
     def execute_plan(self) -> int:
         """ Runs all designated actions and rolls back on encountered errors.

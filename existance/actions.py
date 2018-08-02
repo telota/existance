@@ -90,13 +90,13 @@ class ConcludedMessage:
         self.message = message
 
     def __enter__(self):
-        print(self.message, end=' ')
+        print(self.message, end=' ', flush=True)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None:
-            print('✔')
+            print('\033[92m✔\033[0m', flush=True)
         else:
-            print('✖️')
+            print('\033[91m✖️\033[0m', flush=True)
 
 
 def export(obj):
