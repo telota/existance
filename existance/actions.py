@@ -236,8 +236,6 @@ class DownloadInstaller(EphemeralAction):
                 for chunk in response.iter_content(chunk_size=4096):
                     f.write(chunk)
 
-            # TODO file ownership?
-
 
 @export
 class EnableSystemdUnit(Action):
@@ -260,6 +258,7 @@ class GetInstanceName(EphemeralAction):
 class GetLatestExistVersion(EphemeralAction):
     def do(self):
         with ConcludedMessage('Obtaining latest available version.'):
+            # FIXME get the full list and filter out RC releases
             self.context.latest_existdb_version = requests.get(
                 LATEST_EXISTDB_RECORD_URL
             ).json()['tag_name'].split('-', maxsplit=1)[1]
