@@ -14,6 +14,7 @@ import requests
 from existance.constants import (
     EXISTDB_INSTALLER_URL, LATEST_EXISTDB_RECORD_URL, INSTANCE_PORT_RANGE_START,
     INSTANCE_SETTINGS_FIELDS)
+from existance.templates import TEMPLATES
 from existance.utils import make_password_proposal, relative_path
 
 
@@ -236,6 +237,12 @@ class DownloadInstaller(EphemeralAction):
             with self.context.installer_location.open('wb') as f:
                 for chunk in response.iter_content(chunk_size=4096):
                     f.write(chunk)
+
+
+@export
+class DumpTemplate(EphemeralAction):
+    def do(self):
+        print(TEMPLATES[self.args.name])
 
 
 @export

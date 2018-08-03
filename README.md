@@ -59,10 +59,10 @@ be adapted). Quiet obviously, this is how you get it:
 path start with an instance's name to the instance's Jetty process in the 
 directory `/etc/nginx/proxy-mappings`. Make sure to include these in your 
 general web server configuration (`include /etc/nginx/proxy-mappings/*`) for 
-the designated site. A **very basic** stub for site configuration can be 
+the designated site. A **very basic** stub for a site configuration can be 
 obtained with:
 
-    existance template nginx > /etc/nginx/sites-available/existdb
+    existance template nginx-site > /etc/nginx/sites-available/existdb
     chown root.root /etc/nginx/sites-available/existdb
 
 
@@ -123,8 +123,8 @@ group = existdb-users
 
 # the instances' directories will be located within this directory 
 base_directory = /opt
-# the pattern must be congruent with the variable TODO's value in the existctl 
-# script
+# the pattern must be congruent with the variable `instance_dir`'s value in the 
+# existctl script
 instance_dir_pattern = exist_{instance_name}_{instance_id}
 # this file serves as index of all instances and a few settings
 instances_settings = %(base_directory)s/exist_instances_settings.csv

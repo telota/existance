@@ -107,6 +107,13 @@ def make_install_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
     ]
 
 
+def make_template_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
+    return [
+        actions.DumpTemplate,
+    ]
+
+
+
 def make_uninstall_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
     return [
         actions.ReadInstancesSettings,
@@ -265,7 +272,9 @@ def make_argparser(config: ConfigParser) -> argparse.ArgumentParser:
     add_version_arg(upgrade_parser)
 
     template_parser = subcommands.add_parser('template')
-    # TODO implement
+    template_parser.description = 'Writes templates for required scripts and configuration files to stdout.'
+    template_parser.set_defaults(plan_factory=make_template_plan)
+    template_parser.add_argument('name', choices=('existctl', 'nginx-site', 'systemd-unit'))
 
     return cli_parser
 
@@ -287,8 +296,6 @@ def read_config():
         print(f'No valid configuration file found in '
               f'{" or ".join(str(x) for x in POSSIBLE_CONFIG_LOCATIONS)}.')
         raise SystemExit(1)
-
-    # TODO validate config for completeness
 
     return config
 
