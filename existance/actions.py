@@ -178,6 +178,7 @@ class CalculateTargetPaths(EphemeralAction):
         self.context.data_dir = base / 'data'
 
         self.context.existdb_config = self.context.installation_dir / 'conf.xml'
+        self.context.controller_config = self.context.installation_dir / 'webapp' / 'WEB-INF' / 'controller-config.xml'
         self.context.jetty_config = (
              self.context.installation_dir / 'tools' / 'jetty' / 'webapps' /
              'exist-webapp-context.xml'
@@ -301,7 +302,11 @@ class LoadRetainedConfigs(EphemeralAction):
         retained_configs = {}
         with ConcludedMessage('Loading configs that will be re-used.'):
 
-            for config in (self.context.existdb_config, self.context.jetty_config):
+            for config in (
+                    self.context.existdb_config,
+                    self.context.controller_config,
+                    self.context.jetty_config,
+            ):
                 with config.open('rt') as f:
                     retained_configs[config] = f.read()
 
