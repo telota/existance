@@ -224,7 +224,7 @@ def make_argparser(config: ConfigParser) -> argparse.ArgumentParser:
     )
     cli_parser.add_argument(
         '--installer-cache', type=Path, metavar='DIRPATH',
-        default=config.get('existance', 'installer_cache', fallback=TMP),
+        default=config.get('existance', 'installer_cache') or TMP,
         help='A folder that is used as cache for eXist-db installation files.'
     )
     cli_parser.add_argument(
@@ -305,6 +305,8 @@ def read_config():
 
 def main(command=sys.argv[0], args=sys.argv[1:]):
     try:
+        if not args:
+            args = ['--help']
         if '--help' not in sys.argv[1:]:
             if os.geteuid() != 0:
                 os.execvp('sudo', ['sudo', command] + args)
