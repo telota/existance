@@ -224,7 +224,7 @@ class DownloadInstaller(EphemeralAction):
 
         if self.context.installer_location.exists():
             print(
-                "Installer found at {location}. '✔'"
+                "Installer found at {location}. \033[92m✔\033[0m"
                 .format(location=self.context.installer_location)
             )
             return
