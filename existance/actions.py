@@ -482,11 +482,13 @@ class SetDesignatedInstanceID(EphemeralAction):
                 .format(proposed=proposed_id)
             )
             if not value:
-                args.id = proposed_id
+                value = proposed_id
             if value in instances_settings:
                 print(
                     "Instance ID is already in use, please select another one."
                 )
+            else:
+                args.id = int(value)
 
 
 @export
