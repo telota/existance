@@ -441,9 +441,10 @@ class SelectInstanceID(EphemeralAction):
                 print(f'{item["id"]}: {item["name"]}')
 
             value = input('> ')
-            if not isinstance(value, int):
-                continue
-            args.id = value
+            try:
+                args.id = int(value)
+            except ValueError:
+                args.id = None
 
 
 @export
