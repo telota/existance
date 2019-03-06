@@ -123,6 +123,31 @@ case $action in
 esac
 """
 
+
+NGINX_MAPPING_TEMPLATE = """\
+# This is a stub that is used to expose a particular eXist-db instance with
+# the webserver to the public.
+# You need to
+# - include this configuration in the webserver configuration
+#   - e.g. place it in /etc/nginx/proxy-mappings in conjunction with the
+#     `nginx-site` template
+# - replace the tokens enclosed by < and > with actual values
+
+# location /<instance_name>/ {
+#    proxy_pass http://localhost:<instance_id>/<instance_name>/;
+# }
+
+# Don't make reconnaissance too easy for the bad guys.
+#
+# location = /<instance_name>/status {
+#    allow <ip_of_a_local_gateway>;
+#    deny all;
+#    proxy_pass http://localhost:<instance_id>/<instance_name>/status;
+# }
+
+"""
+
+
 NGINX_SITE_TEMPLATE = """\
 server {
     listen 443 ssl http2 default_server;
@@ -160,5 +185,6 @@ WantedBy=multi-user.target
 TEMPLATES = {
     'existctl': EXISTCTL_TEMPLATE,
     'nginx-site': NGINX_SITE_TEMPLATE,
+    'nginx-mapping': NGINX_MAPPING_TEMPLATE,
     'systemd-unit': SYSTEMD_UNIT_TEMPLATE,
 }

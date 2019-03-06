@@ -11,6 +11,7 @@ from typing import List, Tuple
 
 from existance import actions
 from existance.constants import TMP
+from existance.templates import TEMPLATES
 
 
 #
@@ -113,7 +114,6 @@ def make_template_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
     ]
 
 
-
 def make_uninstall_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
     return [
         actions.ReadInstancesSettings,
@@ -188,16 +188,16 @@ def make_argparser(config: ConfigParser) -> argparse.ArgumentParser:
     existance is a tool to manage several instances of eXist-db instances on a
     single host. It assumes systemd as the operating system's service manager and
     nginx as TLS-terminating proxy.
-    
-    For guidance on a first setup of all needed components, see the online 
+
+    For guidance on a first setup of all needed components, see the online
     documentation and the help for the template subcommand.
-    
+
     The general parameters should only be used to bypass the settings in the global
     configuration.
-    
+
     In order to use any of the management commands the executing user's effective
     id must be 0, the tool will try to elevate privileges with the sudo command.
-    
+
     The online documentation is currently available at:
     https://github.com/telota/existance/blob/master/README.md
     """)
@@ -274,7 +274,7 @@ def make_argparser(config: ConfigParser) -> argparse.ArgumentParser:
     template_parser = subcommands.add_parser('template')
     template_parser.description = 'Writes templates for required scripts and configuration files to stdout.'
     template_parser.set_defaults(plan_factory=make_template_plan)
-    template_parser.add_argument('name', choices=('existctl', 'nginx-site', 'systemd-unit'))
+    template_parser.add_argument('name', choices=tuple(x for x in TEMPLATES))
 
     return cli_parser
 
