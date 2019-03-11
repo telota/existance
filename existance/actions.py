@@ -156,7 +156,7 @@ class AddProxyMapping(Action):
 
     def do(self):
         snippet = NGINX_MAPPING_ROUTE
-        trusted_clients = self.config['nginx']['trusted_clients'].split(',')
+        trusted_clients = self.config.get('nginx', 'trusted_clients', fallback='').split(',')
         if trusted_clients:
             snippet += NGINX_MAPPING_STATUS_FILTER
 
