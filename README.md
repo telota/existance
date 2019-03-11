@@ -141,10 +141,21 @@ log_directory = /var/logs/existdb
 
 # the default -XmX value for new instances
 XmX_default = 1024m
+```
 
+These configuration parameters can be defined optionally. Where a value is
+documented, it is the default.
+
+```ini
+[exist-db]
 # this list contains names of Jetty configuration files that are not to be
 # used, e.g. because a modern web server can do the job for all instances
 unwanted_jetty_configs = jetty-ssl.xml,jetty-ssl-context.xml,jetty-https.xml
+
+[nginx]
+# this value can be set with a comma-separated list of IPs and networks (CIDR)
+# that are allowed to access sensible parts of the web application.
+trusted_clients = 
 ```
 
 There are still many opinionated values hardcoded in the tool respectively the

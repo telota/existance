@@ -124,7 +124,7 @@ esac
 """
 
 
-NGINX_MAPPING_TEMPLATE = """\
+NGINX_MAPPING_PREAMBLE = """\
 # This is a stub that is used to expose a particular eXist-db instance with
 # the webserver to the public.
 # You need to
@@ -133,18 +133,24 @@ NGINX_MAPPING_TEMPLATE = """\
 #     `nginx-site` template
 # - replace the tokens enclosed by < and > with actual values
 
-# location /<instance_name>/ {
-#    proxy_pass http://localhost:<instance_id>/<instance_name>/;
-# }
+"""
 
+
+NGINX_MAPPING_ROUTE = """\
+location /<instance_name>/ {
+  proxy_pass http://localhost:<instance_id>/<instance_name>/;
+}
+
+"""
+
+
+NGINX_MAPPING_STATUS_FILTER = """\
 # Don't make reconnaissance too easy for the bad guys.
-#
-# location = /<instance_name>/status {
-#    allow <ip_of_a_local_gateway>;
-#    deny all;
-#    proxy_pass http://localhost:<instance_id>/<instance_name>/status;
-# }
-
+location = /<instance_name>/status {
+  allow <trusted_client>;
+  deny all;
+  proxy_pass http://localhost:<instance_id>/<instance_name>/status;
+}
 """
 
 
@@ -185,6 +191,8 @@ WantedBy=multi-user.target
 TEMPLATES = {
     'existctl': EXISTCTL_TEMPLATE,
     'nginx-site': NGINX_SITE_TEMPLATE,
-    'nginx-mapping': NGINX_MAPPING_TEMPLATE,
+    'nginx-mapping':
+        NGINX_MAPPING_PREAMBLE + NGINX_MAPPING_ROUTE +
+        NGINX_MAPPING_STATUS_FILTER,
     'systemd-unit': SYSTEMD_UNIT_TEMPLATE,
 }

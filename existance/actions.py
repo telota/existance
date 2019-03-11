@@ -13,8 +13,11 @@ import requests
 
 from existance.constants import (
     EXISTDB_INSTALLER_URL, LATEST_EXISTDB_RECORD_URL, INSTANCE_PORT_RANGE_START,
-    INSTANCE_SETTINGS_FIELDS)
-from existance.templates import TEMPLATES
+    INSTANCE_SETTINGS_FIELDS
+)
+from existance.templates import (
+    NGINX_MAPPING_ROUTE, NGINX_MAPPING_STATUS_FILTER, TEMPLATES
+)
 from existance.utils import make_password_proposal, relative_path
 
 
@@ -152,11 +155,20 @@ class AddProxyMapping(Action):
         self.mapping_path = Path('/etc') / 'nginx' / 'proxy-mappings' / str(self.args.id)
 
     def do(self):
+        snippet = NGINX_MAPPING_ROUTE
+        trusted_clients = self.config['nginx']['trusted_clients'].split(',')
+        if trusted_clients:
+            snippet += NGINX_MAPPING_STATUS_FILTER
+
+        snippet.replace('<instance_id>', self.args.id)
+        snippet.replace('<instance_name>', self.args.name)
+        snippet.replace('allow <trusted_client>;', ' '.join(
+                            f'allow {x};' for x in trusted_clients)
+                        )
+
         with ConcludedMessage("Writing instance specific nginx config."):
             with self.mapping_path.open('wt') as f:
-                print(f'location /{self.args.name}/ '
-                      f'{{proxy_pass http://localhost:{self.args.id}/{self.args.name}/ ;}}',
-                      file=f)
+                print(snippet, file=f)
             external_command('chown', f'root:{self.args.group}', self.mapping_path)
             external_command('chmod', 'ug=rw,o=r', self.mapping_path)
 
