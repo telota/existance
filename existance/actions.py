@@ -160,7 +160,7 @@ class AddProxyMapping(Action):
         if trusted_clients:
             snippet += NGINX_MAPPING_STATUS_FILTER
 
-        snippet.replace('<instance_id>', self.args.id)
+        snippet.replace('<instance_id>', str(self.args.id))
         snippet.replace('<instance_name>', self.args.name)
         snippet.replace('allow <trusted_client>;', ' '.join(
                             f'allow {x};' for x in trusted_clients)
