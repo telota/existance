@@ -160,11 +160,12 @@ class AddProxyMapping(Action):
         if trusted_clients:
             snippet += NGINX_MAPPING_STATUS_FILTER
 
-        snippet.replace('<instance_id>', str(self.args.id))
-        snippet.replace('<instance_name>', self.args.name)
-        snippet.replace('allow <trusted_client>;', ' '.join(
-                            f'allow {x};' for x in trusted_clients)
-                        )
+        snippet = snippet.replace('<instance_id>', str(self.args.id))
+        snippet = snippet.replace('<instance_name>', self.args.name)
+        snippet = snippet.replace(
+            'allow <trusted_client>;',
+            ' '.join(f'allow {x};' for x in trusted_clients)
+        )
 
         with ConcludedMessage("Writing instance specific nginx config."):
             with self.mapping_path.open('wt') as f:
