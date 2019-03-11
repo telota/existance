@@ -400,12 +400,17 @@ class ReloadNginx(EphemeralAction):
 @export
 class RemoveUnwantedJettyConfig(EphemeralAction):
     def do(self):
-        unwanted_tokens = self.config['exist-db']['unwanted_jetty_configs'].split(',')
+        unwanted_tokens = self.config.get(
+            'exist-db', 'unwanted_jetty_configs',
+            fallback='jetty-ssl.xml,jetty-ssl-context.xml,jetty-https.xml'
+        ).split(',')
+        config_path = (
+            self.context.installation_dir / 'tools' / 'jetty' / 'etc' /
+            'standard.enabled-jetty-configs'
+        )
         with ConcludedMessage('Disabling unwanted parts of the Jetty config.'):
             for token in unwanted_tokens:
-                external_command('sed', '-i', f'/{token}/d',
-                                 self.context.installation_dir / 'tools' / 'jetty' / 'etc'
-                                 / 'standard.enabled-jetty-configs')
+                external_command('sed', '-i', f'/{token}/d', config_path)
 
 
 @export
