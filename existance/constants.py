@@ -1,4 +1,5 @@
 import string
+from os import sep as SEPARATOR
 from tempfile import gettempdir
 
 EXISTDB_INSTALLER_URL = "https://bintray.com/existdb/releases/download_file" \
