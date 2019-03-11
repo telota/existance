@@ -237,12 +237,6 @@ def make_argparser(config: ConfigParser) -> argparse.ArgumentParser:
         default=config.get('exist-db', 'group'),
         help='The system usergroup that is supposed to run the installed instances.',
     )
-    cli_parser.add_argument(
-        '--unwanted-jetty-configs', metavar='FILENAMES',
-        default=config.get('exist-db', 'unwanted_jetty_configs'),
-        help='A comma-separated list of Jetty configuration files that will be '
-             'deactivated from the eXist-db distribution defaults.',
-    )
 
     install_parser = subcommands.add_parser('install')
     install_parser.description = 'Installs a new eXist-db instance.'
