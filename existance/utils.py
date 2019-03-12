@@ -5,7 +5,7 @@ from existance.constants import PASSWORD_CHARACTERS, SEPARATOR
 
 
 def make_password_proposal(length: int = 32) -> str:
-    result = ''
+    result = ""
     while len(result) < length:
         result += random.choice(PASSWORD_CHARACTERS)
     return result
@@ -23,7 +23,7 @@ def relative_path(target: Path, source: Path) -> Path:
     if len(source_parts) >= len(target_parts):
         while source_parts:
             source_parts.pop()
-            target_parts.insert(0, '..')
+            target_parts.insert(0, "..")
         return Path(SEPARATOR.join(target_parts))
     else:
         raise NotImplementedError

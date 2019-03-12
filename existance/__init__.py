@@ -17,7 +17,10 @@ from existance.templates import TEMPLATES
 #
 
 
-POSSIBLE_CONFIG_LOCATIONS = (Path('~') / '.existance.ini', Path('/etc') / 'existance.ini')
+POSSIBLE_CONFIG_LOCATIONS = (
+    Path("~") / ".existance.ini",
+    Path("/etc") / "existance.ini",
+)
 
 cli_parser = None
 
@@ -26,8 +29,12 @@ cli_parser = None
 
 
 class PlanExecutor:
-    def __init__(self, plan: List[actions.ActionBase], args: argparse.Namespace,
-                 config: ConfigParser):
+    def __init__(
+        self,
+        plan: List[actions.ActionBase],
+        args: argparse.Namespace,
+        config: ConfigParser,
+    ):
 
         self.plan = plan
         self.args = args
@@ -40,16 +47,16 @@ class PlanExecutor:
         return self.execute_plan()
 
     def do_rollback(self):
-        print('Rolling back changes… ')
+        print("Rolling back changes… ")
         for action in self.rollback_plan:
             try:
                 action.undo()
             except KeyboardInterrupt:
                 pass
             except Exception:
-                print('Please report this unhandled exception:')
+                print("Please report this unhandled exception:")
                 print_exc()
-                print('The rollback is continued anyway.')
+                print("The rollback is continued anyway.")
 
     def execute_plan(self) -> int:
         """ Runs all designated actions and rolls back on encountered errors.
@@ -64,11 +71,11 @@ class PlanExecutor:
                     self.rollback_plan.insert(0, action)
                 action.do()
             except KeyboardInterrupt:
-                print('Process aborted.')
+                print("Process aborted.")
                 self.do_rollback()
                 raise SystemExit(1)
             except Exception:
-                print('Please report this unhandled exception:')
+                print("Please report this unhandled exception:")
                 print_exc()
                 self.do_rollback()
                 raise SystemExit(3)
@@ -109,9 +116,7 @@ def make_install_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
 
 
 def make_template_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
-    return [
-        actions.DumpTemplate,
-    ]
+    return [actions.DumpTemplate]
 
 
 def make_uninstall_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
@@ -200,75 +205,88 @@ def make_argparser(config: ConfigParser) -> argparse.ArgumentParser:
 
     The online documentation is currently available at:
     https://github.com/telota/existance/blob/master/README.md
-    """)
-    cli_parser.epilog = "Help for the subcommands can be printed by invoking them" \
-                        "with the --help argument."
+    """
+    )
+    cli_parser.epilog = (
+        "Help for the subcommands can be printed by invoking them"
+        "with the --help argument."
+    )
 
     subcommands = cli_parser.add_subparsers()
 
     cli_parser.add_argument(
-        '--base-directory', type=Path, metavar='DIRPATH',
-        default=config.get('exist-db', 'base_directory'),
-        help='The base folder of the exist-db instances.'
+        "--base-directory",
+        type=Path,
+        metavar="DIRPATH",
+        default=config.get("exist-db", "base_directory"),
+        help="The base folder of the exist-db instances.",
     )
     cli_parser.add_argument(
-        '--instances-settings', type=Path, metavar='FILEPATH',
-        default=config.get('exist-db', 'instances_settings'),
-        help='The file that collects a few information about the instances.'
+        "--instances-settings",
+        type=Path,
+        metavar="FILEPATH",
+        default=config.get("exist-db", "instances_settings"),
+        help="The file that collects a few information about the instances.",
     )
     cli_parser.add_argument(
-        '--log-directory', type=Path, metavar='DIRPATH',
-        default=config.get('exist-db', 'log_directory'),
-        help='The base folder where the different log files folders of an instance '
-             'are linked for quick access.'
+        "--log-directory",
+        type=Path,
+        metavar="DIRPATH",
+        default=config.get("exist-db", "log_directory"),
+        help="The base folder where the different log files folders of an instance "
+        "are linked for quick access.",
     )
     cli_parser.add_argument(
-        '--installer-cache', type=Path, metavar='DIRPATH',
-        default=config.get('existance', 'installer_cache') or TMP,
-        help='A folder that is used as cache for eXist-db installation files.'
+        "--installer-cache",
+        type=Path,
+        metavar="DIRPATH",
+        default=config.get("existance", "installer_cache") or TMP,
+        help="A folder that is used as cache for eXist-db installation files.",
     )
     cli_parser.add_argument(
-        '--user',
-        default=config.get('exist-db', 'user'),
-        help='The system user that is supposed to run the installed instances.',
+        "--user",
+        default=config.get("exist-db", "user"),
+        help="The system user that is supposed to run the installed instances.",
     )
     cli_parser.add_argument(
-        '--group',
-        default=config.get('exist-db', 'group'),
-        help='The system usergroup that is supposed to run the installed instances.',
+        "--group",
+        default=config.get("exist-db", "group"),
+        help="The system usergroup that is supposed to run the installed instances.",
     )
 
-    install_parser = subcommands.add_parser('install')
-    install_parser.description = 'Installs a new eXist-db instance.'
+    install_parser = subcommands.add_parser("install")
+    install_parser.description = "Installs a new eXist-db instance."
 
     install_parser.set_defaults(plan_factory=make_install_plan)
     add_id_arg(install_parser)
     install_parser.add_argument(
-        '--name',
-        help='Specifies the name of the new instance.'
+        "--name", help="Specifies the name of the new instance."
     )
     add_version_arg(install_parser)
     install_parser.add_argument(
-        '--xmx', metavar='VALUE',
-        default=config.get('exist-db', 'XmX_default'),
-        help='Specifies the assigned XmX value for the new instance.',
+        "--xmx",
+        metavar="VALUE",
+        default=config.get("exist-db", "XmX_default"),
+        help="Specifies the assigned XmX value for the new instance.",
     )
 
-    uninstall_parser = subcommands.add_parser('uninstall')
-    uninstall_parser.description = 'Uninstalls an existing instance.'
+    uninstall_parser = subcommands.add_parser("uninstall")
+    uninstall_parser.description = "Uninstalls an existing instance."
     uninstall_parser.set_defaults(plan_factory=make_uninstall_plan)
     add_id_arg(uninstall_parser)
 
-    upgrade_parser = subcommands.add_parser('upgrade')
-    upgrade_parser.description = 'Upgrades an existing instance to a new version.'
+    upgrade_parser = subcommands.add_parser("upgrade")
+    upgrade_parser.description = "Upgrades an existing instance to a new version."
     upgrade_parser.set_defaults(plan_factory=make_upgrade_plan)
     add_id_arg(upgrade_parser)
     add_version_arg(upgrade_parser)
 
-    template_parser = subcommands.add_parser('template')
-    template_parser.description = 'Writes templates for required scripts and configuration files to stdout.'
+    template_parser = subcommands.add_parser("template")
+    template_parser.description = (
+        "Writes templates for required scripts and configuration files to stdout."
+    )
     template_parser.set_defaults(plan_factory=make_template_plan)
-    template_parser.add_argument('name', choices=tuple(x for x in TEMPLATES))
+    template_parser.add_argument("name", choices=tuple(x for x in TEMPLATES))
 
     return cli_parser
 
@@ -287,8 +305,10 @@ def read_config():
             config.read(location)
             break
     else:
-        print(f'No valid configuration file found in '
-              f'{" or ".join(str(x) for x in POSSIBLE_CONFIG_LOCATIONS)}.')
+        print(
+            f"No valid configuration file found in "
+            f'{" or ".join(str(x) for x in POSSIBLE_CONFIG_LOCATIONS)}.'
+        )
         raise SystemExit(1)
 
     return config
@@ -300,10 +320,10 @@ def read_config():
 def main(command=sys.argv[0], args=sys.argv[1:]):
     try:
         if not args:
-            args = ['--help']
-        if '--help' not in sys.argv[1:]:
+            args = ["--help"]
+        if "--help" not in sys.argv[1:]:
             if os.geteuid() != 0:
-                os.execvp('sudo', ['sudo', command] + args)
+                os.execvp("sudo", ["sudo", command] + args)
             config = read_config()
         else:
             config = {}
@@ -313,18 +333,18 @@ def main(command=sys.argv[0], args=sys.argv[1:]):
         executor = PlanExecutor(actions_plan, args, config)
         raise SystemExit(executor())
     except KeyboardInterrupt:
-        print('\nReceived keyboard interrupt, rolling back.')
+        print("\nReceived keyboard interrupt, rolling back.")
         executor.do_rollback()
         exit_code = 1
     except SystemExit as e:
         exit_code = e.code
     except Exception:
-        print('\nPlease report this unhandled exception:')
+        print("\nPlease report this unhandled exception:")
         print_exc(file=sys.stdout)
         exit_code = 3
     finally:
         sys.exit(exit_code)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

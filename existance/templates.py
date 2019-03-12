@@ -189,10 +189,10 @@ WantedBy=multi-user.target
 
 
 TEMPLATES = {
-    'existctl': EXISTCTL_TEMPLATE,
-    'nginx-site': NGINX_SITE_TEMPLATE,
-    'nginx-mapping':
-        NGINX_MAPPING_PREAMBLE + NGINX_MAPPING_ROUTE +
-        NGINX_MAPPING_STATUS_FILTER,
-    'systemd-unit': SYSTEMD_UNIT_TEMPLATE,
+    "existctl": EXISTCTL_TEMPLATE,
+    "nginx-site": NGINX_SITE_TEMPLATE,
+    "nginx-mapping": NGINX_MAPPING_PREAMBLE
+    + NGINX_MAPPING_ROUTE
+    + NGINX_MAPPING_STATUS_FILTER,
+    "systemd-unit": SYSTEMD_UNIT_TEMPLATE,
 }
