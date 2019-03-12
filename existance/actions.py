@@ -156,7 +156,11 @@ class AddProxyMapping(Action):
 
     def do(self):
         snippet = NGINX_MAPPING_ROUTE
-        trusted_clients = self.config.get('nginx', 'trusted_clients', fallback='').split(',')
+        trusted_clients = [
+            x for x
+            in self.config.get('nginx', 'trusted_clients', fallback='').split(',')
+            if x
+        ]
         if trusted_clients:
             snippet += NGINX_MAPPING_STATUS_FILTER
 
@@ -413,10 +417,14 @@ class ReloadNginx(EphemeralAction):
 @export
 class RemoveUnwantedJettyConfig(EphemeralAction):
     def do(self):
-        unwanted_tokens = self.config.get(
-            'exist-db', 'unwanted_jetty_configs',
-            fallback='jetty-ssl.xml,jetty-ssl-context.xml,jetty-https.xml'
-        ).split(',')
+        unwanted_tokens = [
+            x for x in
+            self.config.get(
+                'exist-db', 'unwanted_jetty_configs',
+                fallback='jetty-ssl.xml,jetty-ssl-context.xml,jetty-https.xml'
+            ).split(',')
+            if x
+        ]
         config_path = (
             self.context.installation_dir / 'tools' / 'jetty' / 'etc' /
             'standard.enabled-jetty-configs'
