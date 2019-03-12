@@ -11,7 +11,7 @@ with (BASE_DIR / "README.md").open("rt") as f:
 
 setup(
     name="existance",
-    version="0.1.b1",
+    version="0.1.b2",
     description="A tool to integrate eXist-db instances on a Linux host.",
     long_description=long_description,
     long_description_content_type="text/markdown",
