@@ -131,7 +131,7 @@ group = existdb-users
 # the instances' directories will be located within this directory
 base_directory = /opt
 # the pattern must be congruent with the variable `instance_dir`'s value in the
-# existctl script
+# existctl script and the assertion's argument in the systemd unit file
 instance_dir_pattern = exist_{instance_name}_{instance_id}
 # this file serves as index of all instances and a few settings
 instances_settings = %(base_directory)s/exist_instances_settings.csv

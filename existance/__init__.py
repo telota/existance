@@ -18,7 +18,7 @@ from existance.templates import TEMPLATES
 
 
 POSSIBLE_CONFIG_LOCATIONS = (
-    Path("~") / ".existance.ini",
+    Path.home() / ".existance.ini",
     Path("/etc") / "existance.ini",
 )
 

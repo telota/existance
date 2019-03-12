@@ -202,15 +202,15 @@ class AddProxyMapping(Action):
 @export
 class CalculateTargetPaths(EphemeralAction):
     def do(self):
-        base = self.context.instance_dir = self.args.base_directory / self.config[
+        instance_base = self.context.instance_dir = self.args.base_directory / self.config[
             "exist-db"
         ].get("instance_dir_pattern", "{instance_name}").format(
             instance_name=self.args.name, instance_id=self.args.id
         )
 
-        self.context.installation_dir = base / "existdb"
-        self.context.backup_dir = base / "backup"
-        self.context.data_dir = base / "data"
+        self.context.installation_dir = instance_base / "existdb"
+        self.context.backup_dir = instance_base / "backup"
+        self.context.data_dir = instance_base / "data"
 
         self.context.existdb_config = self.context.installation_dir / "conf.xml"
         self.context.controller_config = (
@@ -286,7 +286,19 @@ class DownloadInstaller(EphemeralAction):
 @export
 class DumpTemplate(EphemeralAction):
     def do(self):
-        print(TEMPLATES[self.args.name])
+        content = TEMPLATES[self.args.name]
+        if isinstance(content, bytes):
+            content = content.decode()
+
+        for token, replacement in (
+            ("<existdb_user>", self.config["exist-db"]["user"]),
+            ("<instances_root>", self.args.base_directory),
+            ("<instances_settings>", self.args.instances_settings),
+            ("<now>", datetime.utcnow()),
+        ):
+            content = content.replace(token, str(replacement))
+
+        print(content)
 
 
 @export
