@@ -1,7 +1,22 @@
 import random
+import subprocess
 from pathlib import Path
 
-from existance.constants import PASSWORD_CHARACTERS, SEPARATOR
+from existance.constants import (
+    INTERACTIVE_SUBPROCESS_KWARGS,
+    PASSWORD_CHARACTERS,
+    SEPARATOR
+)
+
+
+def external_command(*args, **kwargs) -> subprocess.CompletedProcess:
+    # TODO *maybe* the input argument can be used to provide input and thus the
+    #      installer may not require user input
+
+    args = tuple(str(x) for x in args)
+    run_kwargs = {} if "capture_output" in kwargs else INTERACTIVE_SUBPROCESS_KWARGS
+    result = subprocess.run(args, **{'check': True, **run_kwargs, **kwargs})
+    return result
 
 
 def make_password_proposal(length: int = 32) -> str:

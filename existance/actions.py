@@ -1,8 +1,6 @@
 import csv
 import re
 import shutil
-import subprocess
-import sys
 import textwrap
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -22,7 +20,11 @@ from existance.templates import (
     NGINX_MAPPING_STATUS_FILTER,
     TEMPLATES,
 )
-from existance.utils import make_password_proposal, relative_path
+from existance.utils import (
+    external_command,
+    make_password_proposal,
+    relative_path
+)
 
 
 is_semantical_version = re.compile(r"^\d+\.\d+(\.\d+)?").match
@@ -112,20 +114,6 @@ class ConcludedMessage:
 def export(obj):
     __all__.append(obj.__name__)
     return obj
-
-
-def external_command(*args, **kwargs):
-    args = tuple(str(x) for x in args)
-    run_kwargs = {
-        "stdin": sys.stdin,
-        "stdout": sys.stdout,
-        "stderr": sys.stderr,
-        "check": True,
-    }
-    run_kwargs.update(kwargs)
-    subprocess.run(args, **kwargs)
-    # TODO *maybe* the input argument can be used to provide input and thus the installer
-    # may not require user input
 
 
 #

@@ -1,7 +1,14 @@
 import string
+import sys
 from os import sep as SEPARATOR  # noqa: F401
 from tempfile import gettempdir
 
+INTERACTIVE_SUBPROCESS_KWARGS = {
+    "stdin": sys.stdin,
+    "stdout": sys.stdout,
+    "stderr": sys.stderr,
+    "check": True,
+}
 EXISTDB_INSTALLER_URL = (
     "https://bintray.com/existdb/releases/download_file"
     "?file_path=eXist-db-setup-{version}.jar"
