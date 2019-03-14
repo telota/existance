@@ -62,7 +62,7 @@ directory `/etc/nginx/proxy-mappings`.
 A template for such configuration can also be produced with the `template`
 subcommand.
 Make sure to include these in your general web server configuration
-(`include /etc/nginx/proxy-mappings/*`) for the designated site. 
+(`include /etc/nginx/proxy-mappings/*`) for the designated site.
 
 A **very basic** stub for a site configuration can be obtained with:
 
@@ -155,7 +155,7 @@ unwanted_jetty_configs = jetty-ssl.xml,jetty-ssl-context.xml,jetty-https.xml
 [nginx]
 # this value can be set with a comma-separated list of IPs and networks (CIDR)
 # that are allowed to access sensible parts of the web application.
-trusted_clients = 
+trusted_clients =
 ```
 
 There are still many opinionated values hardcoded in the tool respectively the
@@ -195,6 +195,11 @@ after running
 the instance's dashboard is available at https://exist.mydomain.web/my_project/
 and you're good to go.
 
+### list
+
+The `list` subcommand prints an overview of all `existance`-handled instances
+of eXist-db in the terminal.
+
 ### uninstall
 
 This is basically the opposite of the previous and you can get rid of an
@@ -220,7 +225,17 @@ occurs during the upgrade, these are restored.
 
 ### template
 
-TBA
+The `template` subcommand can be used to obtain scripts and configuration files
+that are required for system integration. It considers the configuration from
+`existance.ini` as far as possible. These template names can be given as
+positional argument:
+
+| name            | description |
+| --------------- | ----------- |
+| `existctl`      | The wrapper script to orderly start and stop eXist-db on *ix-systems. It must be installed in `/usr/local/bin`. |
+| `nginx-site`    | A stub for an nginx site configuration that usually replaces `/etc/nginx/sites-available/default`. |
+| `nginx-mapping` | A template to configure nginx as a proxy to an instance's Jetty service. This is merely a reference, `existance install` installs these. |
+| `systemd-unit`  | This unit file should be placed in `/etc/systemd/system`.  |
 
 
 ## Further recommendations
