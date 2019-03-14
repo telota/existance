@@ -4,10 +4,12 @@ import shutil
 import textwrap
 from abc import ABC, abstractmethod
 from datetime import datetime
+from os import get_terminal_size
 from pathlib import Path
 from xml.etree import ElementTree
 
 import requests
+from texttable import Texttable
 
 from existance.constants import (
     EXISTDB_INSTALLER_URL,
@@ -349,6 +351,32 @@ class InstallerPrologue(EphemeralAction):
         """
             )
         )
+
+
+@export
+class ListInstances(EphemeralAction):
+    def do(self):
+        table = Texttable(max_width=get_terminal_size().columns - 2)
+        table.header(("id", "name", "status", "XmX"))
+        table.set_header_align(("c", "c", "c", "c"))
+        table.set_cols_align(("r", "l", "l", "r"))
+        table.set_deco(Texttable.HEADER | Texttable.VLINES)
+
+        for _id, settings in self.context.instances_settings.items():
+            active_state = external_command(
+                "systemctl", "is-active", f"existdb@{_id}",
+                capture_output=True, check=False, text=True
+            ).stdout.strip()
+            enabled_state = external_command(
+                "systemctl", "is-enabled", f"existdb@{_id}",
+                capture_output=True, check=False, text=True
+            ).stdout.strip()
+
+            table.add_row((_id, settings["name"], f"{enabled_state}\n{active_state}", settings["xmx"]))
+
+        print("\n" + table.draw())
+        print("\nThe XmX values refer to the configuration, "
+              "not necessarily the currently effective.")
 
 
 @export

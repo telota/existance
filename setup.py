@@ -31,7 +31,7 @@ setup(
     keywords="eXist-db",
     packages=find_packages(exclude=["docs", "tests"]),
     package_data={"existance": ["files/*"]},
-    requires=["requests"],
+    requires=["requests", "texttable"],
     python_requires=">=3.6",
     entry_points={"console_scripts": ["existance=existance:main"]},
 )

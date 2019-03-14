@@ -115,6 +115,15 @@ def make_install_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
     ]
 
 
+def make_list_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
+    if args.paths:
+        raise NotImplementedError
+    return [
+        actions.ReadInstancesSettings,
+        actions.ListInstances
+    ]
+
+
 def make_template_plan(args: argparse.Namespace) -> List[actions.ActionBase]:
     return [actions.DumpTemplate]
 
@@ -270,6 +279,22 @@ def make_argparser(config: ConfigParser) -> argparse.ArgumentParser:
         help="Specifies the assigned XmX value for the new instance.",
     )
 
+    list_parser = subcommands.add_parser("list")
+    list_parser.description = "Lists all installed instances."
+    list_parser.set_defaults(plan_factory=make_list_plan)
+    list_parser.add_argument(
+        "--paths",
+        action="store_true",
+        help="Also displays relevant paths of an instance."
+    )
+
+    template_parser = subcommands.add_parser("template")
+    template_parser.description = (
+        "Writes templates for required scripts and configuration files to stdout."
+    )
+    template_parser.set_defaults(plan_factory=make_template_plan)
+    template_parser.add_argument("name", choices=tuple(x for x in TEMPLATES))
+
     uninstall_parser = subcommands.add_parser("uninstall")
     uninstall_parser.description = "Uninstalls an existing instance."
     uninstall_parser.set_defaults(plan_factory=make_uninstall_plan)
@@ -280,13 +305,6 @@ def make_argparser(config: ConfigParser) -> argparse.ArgumentParser:
     upgrade_parser.set_defaults(plan_factory=make_upgrade_plan)
     add_id_arg(upgrade_parser)
     add_version_arg(upgrade_parser)
-
-    template_parser = subcommands.add_parser("template")
-    template_parser.description = (
-        "Writes templates for required scripts and configuration files to stdout."
-    )
-    template_parser.set_defaults(plan_factory=make_template_plan)
-    template_parser.add_argument("name", choices=tuple(x for x in TEMPLATES))
 
     return cli_parser
 
