@@ -11,6 +11,8 @@ ExecReload=/usr/local/bin/existctl restart %i
 User=<existdb_user>
 PIDFile=/tmp/exist_pids/%i.pid
 Restart=always
+# This is the debatable way how Java tells that it exited due to a signal:
+SuccessExitStatus=143
 
 [Install]
 WantedBy=multi-user.target
